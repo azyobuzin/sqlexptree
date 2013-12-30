@@ -1,0 +1,4 @@
+*.suo
+obj
+*.pyc
+__pycache__
