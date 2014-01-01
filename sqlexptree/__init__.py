@@ -9,59 +9,67 @@ license: The MIT License, see http://opensource.org/licenses/mit-license.php
 __author__ = "azyobuzin"
 __version__ = "1.0"
 
-import decimal
-
-def _escape_string(s):
-    assert isinstance(s, str)
-    return (s.replace("\0", "\\0")
-            .replace("'", "\\'")
-            .replace("\"", "\\\"")
-            .replace("\b", "\\b")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-            .replace("\032", "\\Z")
-            .replace("\\", "\\\\")
-            .replace("%", "\\%")
-            .replace("_", "\\_"))
-
-def _quote_string(s):
-    assert isinstance(s, str)
-    return "'" + _escape_string(s) + "'"
-
-def _quote(obj):
-    if obj is None:
-        return "NULL"
-    if isinstance(obj, bool):
-        return "1" if obj else "0"
-    if isinstance(obj, SNameBase):
-        return "*"
-    if isinstance(obj, (int, float, decimal.Decimal, _SOperatable)):
-        return str(obj)
-    if isinstance(obj, str):
-        return _quote_string(obj)
-    raise TypeError()
-
-def _quote_identifier(s):
-    assert isinstance(s, str)
-    return "`" + s.replace("`", "``") + "`"
+if isinstance(u"", str):
+    unicode = str
 
 class SqlBuilder(object):
     """A object to build SQL."""
 
-    def __init__(self, sql=""):
+    def __init__(self, encoding="utf-8", sql=b""):
+        self._encoding = encoding
         self._sql = sql
 
+    def _as_bytes(self, s):
+        if isinstance(s, bytes):
+            return s
+        if isinstance(s, (str, unicode)):
+            return s.encode(self._encoding)
+        raise TypeError()
+
+    def _quote_string(self, s):
+        return (b"'" + self._as_bytes(s)
+                .replace(b"\0", b"\\0")
+                .replace(b"'", b"\\'")
+                .replace(b"\"", b"\\\"")
+                .replace(b"\b", b"\\b")
+                .replace(b"\n", b"\\n")
+                .replace(b"\r", b"\\r")
+                .replace(b"\t", b"\\t")
+                .replace(b"\032", b"\\Z")
+                .replace(b"\\", b"\\\\")
+                .replace(b"%", b"\\%")
+                .replace(b"_", b"\\_") + b"'")
+
+    def _quote(self, obj):
+        import decimal
+
+        if obj is None:
+            return b"NULL"
+        if isinstance(obj, bool):
+            return b"1" if obj else b"0"
+        if isinstance(obj, SNameBase):
+            return b"*"
+        if isinstance(obj, (int, float, decimal.Decimal)):
+            return self._as_bytes(str(obj))
+        if isinstance(obj, _SOperatable):
+            return obj._to_bytes(self)
+        if isinstance(obj, (str, unicode)):
+            return self._quote_string(obj)
+        raise TypeError()
+
+    def _quote_identifier(self, s):
+        return b"`" + self._as_bytes(s).replace(b"`", b"``") + b"`"
+
     def build(self):
-        """Returns the built SQL string."""
+        """Returns the built SQL bytes."""
         return self._sql.strip()
 
-    def __str__(self):
+    def __bytes__(self):
         return self.build()
 
     def append(self, s):
         """Returns the SqlBuilder object appended specified raw SQL."""
-        return SqlBuilder(self._sql + " " + s)
+        return SqlBuilder(self._encoding, self._sql + b" " + self._as_bytes(s))
 
     def from_tables(self, tables):
         """
@@ -72,10 +80,8 @@ class SqlBuilder(object):
 
         if not isinstance(tables, (list, tuple)):
             tables = [tables]
-        return self.append("from " + ", ".join(_quote_identifier(table) for table in tables))
-
-    FROM = from_tables
-
+        return self.append(b"from " + b", ".join(self._quote_identifier(table) for table in tables))
+    
     def select(self, selector):
         """
         SELECT syntax
@@ -88,20 +94,18 @@ class SqlBuilder(object):
                           * lambda _: { "A": _.column0, "": _.column1 }
         """
         
-        if isinstance(selector, str):
-            return self.append("select " + selector)
+        if isinstance(selector, (str, unicode, bytes)):
+            return self.append(b"select " + self._as_bytes(selector))
 
         result = selector(SNameBase())
         if isinstance(result, dict):
-            select_expr = ", ".join(_quote_identifier(key) + " as " + _quote(value) for key, value in result.items())
+            select_expr = b", ".join(self._quote_identifier(key) + b" as " + self._quote(value) for key, value in result.items())
         elif isinstance(result, (list, tuple)):
-            select_expr = ",".join(_quote(obj) for obj in result)
+            select_expr = b",".join(self._quote(obj) for obj in result)
         else:
-            select_expr = _quote(result)
-        return self.append("select " + select_expr)
-
-    SELECT = select
-
+            select_expr = self._quote(result)
+        return self.append(b"select " + select_expr)
+    
     def where(self, predicate):
         """
         WHERE clause
@@ -110,16 +114,19 @@ class SqlBuilder(object):
                    example * lambda _: op_and(_.column0 > 5, _.column1 < 10)
         """
 
-        if isinstance(predicate, str):
-            return self.append("where " + predicate)
+        if isinstance(predicate, (str, unicode, bytes)):
+            return self.append(b"where " + self._as_bytes(predicate))
 
-        return self.append("where " + _quote(predicate(SNameBase())))
+        return self.append(b"where " + self._quote(predicate(SNameBase())))
 
 class SNameBase(object):
     def __getattr__(self, name):
         return SName([name])
 
 class _SOperatable(object):
+    import abc
+    __metaclass__ = abc.ABCMeta
+
     def __lt__(self, other):
         return SOperator("<", self, other)
 
@@ -225,12 +232,16 @@ class _SOperatable(object):
     def __abs__(self):
         return SMethod(["abs"], (self,))
 
+    @abc.abstractmethod
+    def _to_bytes(self, builder):
+        return b""
+
 class SName(_SOperatable):
     def __init__(self, name_list):
         self.__name_list = list(name_list)
 
-    def __str__(self):
-        return ".".join(_quote_identifier(s) for s in self.__name_list)
+    def _to_bytes(self, builder):
+        return b".".join(builder._quote_identifier(s) for s in self.__name_list)
 
     def __getattr__(self, name):
         return SName(self.__name_list + [name])
@@ -243,28 +254,27 @@ class SMethod(_SOperatable):
         self.__name_list = list(name_list)
         self.__args = args
 
-    def __str__(self):
-        return (".".join([_quote_identifier(s) for s in self.__name_list[0:-1]] + [self.__name_list[-1]])
-                + "(" + ", ".join(_quote(arg) for arg in self.__args) + ")")
+    def _to_bytes(self, builder):
+        return (b".".join([builder._quote_identifier(s) for s in self.__name_list[0:-1]] + [builder._as_bytes(self.__name_list[-1])]) + b"(" + b", ".join(builder._quote(arg) for arg in self.__args) + b")")
 
 class SOperator(_SOperatable):
     def __init__(self, op_name, left, right):
-        assert isinstance(op_name, str)
+        assert isinstance(op_name, (str, unicode))
         self.op_name = op_name
         self.left = left
         self.right = right
 
-    def __str__(self):
-        return "(" + _quote(self.left) + " " + self.op_name + " " + _quote(self.right) + ")"
+    def _to_bytes(self, builder):
+        return b"(" + builder._quote(self.left) + b" " + builder._as_bytes(self.op_name) + b" " + builder._quote(self.right) + b")"
 
 class SSingleOperator(_SOperatable):
     def __init__(self, op_name, expr):
-        assert isinstance(op_name, str)
+        assert isinstance(op_name, (str, unicode))
         self.op_name = op_name
         self.expr = expr
 
-    def __str__(self):
-        return "(" + self.op_name + " " + _quote(self.expr) + ")"
+    def _to_bytes(self, builder):
+        return b"(" + builder._as_bytes(self.op_name) + b" " + builder._quote(self.expr) + b")"
 
 def op_or(*exprs):
     op = SOperator("or", exprs[0], exprs[1])
