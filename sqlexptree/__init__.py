@@ -12,6 +12,7 @@ __version__ = "1.0"
 import decimal
 
 def _escape_string(s):
+    assert isinstance(s, str)
     return (s.replace("\0", "\\0")
             .replace("'", "\\'")
             .replace("\"", "\\\"")
@@ -25,6 +26,7 @@ def _escape_string(s):
             .replace("_", "\\_"))
 
 def _quote_string(s):
+    assert isinstance(s, str)
     return "'" + _escape_string(s) + "'"
 
 def _quote(obj):
@@ -36,9 +38,12 @@ def _quote(obj):
         return "*"
     if isinstance(obj, (int, float, decimal.Decimal, _SOperatable)):
         return str(obj)
-    return _quote_string(obj)
+    if isinstance(obj, str):
+        return _quote_string(obj)
+    raise TypeError()
 
 def _quote_identifier(s):
+    assert isinstance(s, str)
     return "`" + s.replace("`", "``") + "`"
 
 class SqlBuilder(object):
@@ -244,6 +249,7 @@ class SMethod(_SOperatable):
 
 class SOperator(_SOperatable):
     def __init__(self, op_name, left, right):
+        assert isinstance(op_name, str)
         self.op_name = op_name
         self.left = left
         self.right = right
@@ -253,6 +259,7 @@ class SOperator(_SOperatable):
 
 class SSingleOperator(_SOperatable):
     def __init__(self, op_name, expr):
+        assert isinstance(op_name, str)
         self.op_name = op_name
         self.expr = expr
 
