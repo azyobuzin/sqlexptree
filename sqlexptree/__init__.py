@@ -179,11 +179,22 @@ class SqlBuilder(object):
         """
         UPDATE syntax
 
-        table  : the table name
-        ignore : add "IGNORE" to the SQL if true
+        table : the table name
+        ignore: add "IGNORE" to the SQL if true
         """
 
         return self.append(b"update " + (b"ignore " if ignore else b"") + self._quote_identifier(table))
+
+    def delete(self, from_tables, quick=False, ignore=False):
+        """
+        DELETE syntax
+
+        from_tables: the table name or a list of the table names]
+        quick      : add "QUICK" to the SQL if true
+        ignore     : add "IGNORE" to the SQL if true
+        """
+
+        return self.append(b"delete"+ (b" quick" if ignore else b"") + (b" ignore" if ignore else b"")).from_tables(from_tables) 
 
 class SNameBase(object):
     def __getattr__(self, name):

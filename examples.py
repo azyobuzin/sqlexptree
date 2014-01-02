@@ -14,6 +14,8 @@ print(SqlBuilder().insert("table", ("column0", "column1")).values(lambda _: (20,
 
 print(SqlBuilder().insert("table").set(lambda _: { "column0": 20, "column1": _.now() }).build())
 
-print(SqlBuilder().update("table", True).set({"column1": 80 }).where(lambda _: _.column0 == 20).build())
+print(SqlBuilder().update("table").set({"column1": 80 }).where(lambda _: _.column0 == 20).build())
+
+print(SqlBuilder().delete("table").where("column1 = 80").build())
 
 input()
