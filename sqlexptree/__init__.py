@@ -171,6 +171,16 @@ class SqlBuilder(object):
         return self.append(b"set " + b", ".join(self._quote_identifier(key) + b"=" + self._quote(value)
             for key, value in (pairs if isinstance(pairs, dict) else pairs(SNameBase())).items()))
 
+    def update(self, table, ignore=False):
+        """
+        UPDATE syntax
+
+        table  : the table name
+        ignore : add "IGNORE" to the SQL if true
+        """
+
+        return self.append(b"update " + (b"ignore " if ignore else b"") + self._quote_identifier(table))
+
 class SNameBase(object):
     def __getattr__(self, name):
         return SName([name])
