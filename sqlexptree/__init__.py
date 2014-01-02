@@ -53,7 +53,7 @@ class SqlBuilder(object):
             return self._as_bytes(str(obj))
         if isinstance(obj, _SOperatable):
             return obj._to_bytes(self)
-        if isinstance(obj, (str, unicode)):
+        if isinstance(obj, (str, unicode, bytes)):
             return self._quote_string(obj)
         raise TypeError()
 
@@ -101,7 +101,7 @@ class SqlBuilder(object):
         if isinstance(result, dict):
             select_expr = b", ".join(self._quote_identifier(key) + b" as " + self._quote(value) for key, value in result.items())
         elif isinstance(result, (list, tuple)):
-            select_expr = b",".join(self._quote(obj) for obj in result)
+            select_expr = b", ".join(self._quote(obj) for obj in result)
         else:
             select_expr = self._quote(result)
         return self.append(b"select " + select_expr)
@@ -118,6 +118,52 @@ class SqlBuilder(object):
             return self.append(b"where " + self._as_bytes(predicate))
 
         return self.append(b"where " + self._quote(predicate(SNameBase())))
+
+    def insert(self, into, columns=None, ignore=False):
+        """
+        INSERT syntax
+
+        into   : the table name
+        columns: the list of column names
+        ignore : add "IGNORE" to the SQL if true
+        """
+
+        result = b"insert"
+        if ignore:
+            result += b" ignore"
+        result += b" into " + self._quote_identifier(into)
+        if columns is not None:
+            if isinstance(columns, (list, tuple)):
+                result += b" (" + b", ".join(self._quote_identifier(s) for s in columns) + b")"
+            else:
+                raise TypeError()
+        return self.append(result)
+
+    def values(self, *values_list):
+        """
+        VALUES clause
+        
+        arguments: some lists of values to insert or some functions that returns the list of values 
+        """
+
+        if len(values_list) == 1 and isinstance(values_list[0], (str, unicode, bytes)):
+            return self.append(b"values " + self._as_bytes(values_list[0]))
+
+        return self.append(b"values " + b", ".join((b"(" + b", ".join(self._quote(value)
+            for value in (arg if isinstance(arg, (list, tuple)) else arg(SNameBase()))) + b")") for arg in values_list))
+
+    def set(self, pairs):
+        """
+        SET clause
+
+        pairs: the dict of column name and value pairs or the function that returns the dict
+        """
+
+        if isinstance(pairs, (str, unicode, bytes)):
+            return self.append(b"where " + self._as_bytes(pairs))
+
+        return self.append(b"set " + b", ".join(self._quote_identifier(key) + b"=" + self._quote(value)
+            for key, value in (pairs if isinstance(pairs, dict) else pairs(SNameBase())).items()))
 
 class SNameBase(object):
     def __getattr__(self, name):
