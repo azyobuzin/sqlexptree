@@ -86,7 +86,7 @@ class SqlBuilder(object):
         """
         SELECT syntax
 
-        selector: the function that returns expression list or dict
+        selector: the list or dict of the column names or the function that returns expression list or dict
                   example * lambda _: _ #equals "*"
                           * lambda _: _.column
                           * lambda _: _.now()
@@ -96,10 +96,16 @@ class SqlBuilder(object):
         
         if isinstance(selector, (str, unicode, bytes)):
             return self.append(b"select " + self._as_bytes(selector))
+        
+        if isinstance(selector, (list, tuple)):
+            return self.append(b"select " + b", ".join(self._quote_identifier(column) for column in selector))
+        if isinstance(selector, dict):
+            return self.append(b"select " + b", ".join(self._quote_identifier(value) + b" as " + self._quote_identifier(key)
+                                                       for key, value in selector.items()))
 
         result = selector(SNameBase())
         if isinstance(result, dict):
-            select_expr = b", ".join(self._quote_identifier(key) + b" as " + self._quote(value) for key, value in result.items())
+            select_expr = b", ".join(self._quote(value) + b" as " + self._quote_identifier(key) for key, value in result.items())
         elif isinstance(result, (list, tuple)):
             select_expr = b", ".join(self._quote(obj) for obj in result)
         else:
