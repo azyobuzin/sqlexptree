@@ -73,10 +73,14 @@ class SqlBuilder(object):
 
     def from_tables(self, tables):
         """
-        FROM syntax
+        FROM clause
         
         tables: the table name or a list of the table names
         """
+
+        if isinstance(tables, dict):
+            return self.append(b"from " + b", ".join(self._quote_identifier(value) + b" as " + self._quote_identifier(key)
+                                                     for key, value in tables.items()))
 
         if not isinstance(tables, (list, tuple)):
             tables = [tables]
@@ -86,7 +90,7 @@ class SqlBuilder(object):
         """
         SELECT syntax
 
-        selector: the list or dict of the column names or the function that returns expression list or dict
+        selector: a list or dict of the column names or a function that returns a list or dict
                   example * lambda _: _ #equals "*"
                           * lambda _: _.column
                           * lambda _: _.now()
@@ -116,7 +120,7 @@ class SqlBuilder(object):
         """
         WHERE clause
 
-        predicate: the function that returns expression
+        predicate: a function that returns expression
                    example * lambda _: op_and(_.column0 > 5, _.column1 < 10)
         """
 
@@ -130,7 +134,7 @@ class SqlBuilder(object):
         INSERT syntax
 
         into   : the table name
-        columns: the list of column names
+        columns: a list of the column names
         ignore : add "IGNORE" to the SQL if true
         """
 
@@ -149,7 +153,7 @@ class SqlBuilder(object):
         """
         VALUES clause
         
-        arguments: some lists of values to insert or some functions that returns the list of values 
+        arguments: some lists of the values to insert or some functions that returns a list
         """
 
         if len(values_list) == 1 and isinstance(values_list[0], (str, unicode, bytes)):
@@ -162,7 +166,7 @@ class SqlBuilder(object):
         """
         SET clause
 
-        pairs: the dict of column name and value pairs or the function that returns the dict
+        pairs: a dict of the column name and the value pairs or a function that returns a dict
         """
 
         if isinstance(pairs, (str, unicode, bytes)):
