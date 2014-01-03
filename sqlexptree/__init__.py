@@ -361,6 +361,20 @@ class SSingleOperator(_SOperatable):
     def _to_bytes(self, builder):
         return b"(" + builder._as_bytes(self.op_name) + b" " + builder._quote(self.expr) + b")"
 
+class SHex(_SOperatable):
+    def __init__(self, hex):
+        import string
+        if isinstance(hex, bytes):
+            assert all(c in string.hexdigits.encode("ascii") for c in hex)
+        elif isinstance(hex, (str, unicode)):
+            assert all(c in string.hexdigits for c in hex)
+        else:
+            raise TypeError()
+        self.hex = hex
+
+    def _to_bytes(self, builder):
+        return b"0x" + builder._as_bytes(self.hex)
+
 def op_or(*exprs):
     op = SOperator("or", exprs[0], exprs[1])
     for expr in exprs[2:]:
@@ -378,3 +392,25 @@ def op_and(*exprs):
 
 def op_not(expr):
     return SSingleOperator("not", expr)
+
+def to_hex(value):
+    """
+    Convert bytes to 0x literal
+
+    value: the bytes
+    """
+    
+    try:
+        hex = "".join("%02x" % b for b in value)
+    except:
+        hex = value.encode("hex")
+    return SHex(hex)
+
+def from_hex_str(value):
+    """
+    Make 0x literal from hex str
+
+    value: a str of the hex
+    """
+    
+    return SHex(value)
