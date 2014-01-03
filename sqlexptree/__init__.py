@@ -86,12 +86,11 @@ class SqlBuilder(object):
         """
 
         if isinstance(tables, dict):
-            return self.append(b"from " + b", ".join(self._quote_identifier(value) + b" as " + self._quote_identifier(key)
-                                                     for key, value in tables.items()))
-
-        if not isinstance(tables, (list, tuple)):
+            tables = tables.items()
+        elif not isinstance(tables, (list, tuple)):
             tables = [tables]
-        return self.append(b"from " + b", ".join(self._quote_identifier(table) for table in tables))
+        return self.append(b"from " + b", ".join((self._quote_identifier(table[1]) + b" as " + self._quote_identifier(table[0])
+            if isinstance(table, (list, tuple)) else self._quote_identifier(table)) for table in tables))
     
     def select(self, selector):
         """
@@ -107,18 +106,19 @@ class SqlBuilder(object):
         
         if isinstance(selector, (str, unicode, bytes)):
             return self.append(b"select " + self._as_bytes(selector))
-        
-        if isinstance(selector, (list, tuple)):
-            return self.append(b"select " + b", ".join(self._quote_identifier(column) for column in selector))
-        if isinstance(selector, dict):
-            return self.append(b"select " + b", ".join(self._quote_identifier(value) + b" as " + self._quote_identifier(key)
-                                                       for key, value in selector.items()))
+
+        if isinstance(selector, (list, tuple, dict)):
+            if isinstance(selector, dict):
+                selector = selector.items()
+            return self.append(b"select " + b", ".join((self._quote_identifier(column[1]) + b" as " + self._quote_identifier(column[0])
+                if isinstance(column, (list, tuple)) else self._quote_identifier(column)) for column in selector))
 
         result = selector(SNameBase())
-        if isinstance(result, dict):
-            select_expr = b", ".join(self._quote(value) + b" as " + self._quote_identifier(key) for key, value in result.items())
-        elif isinstance(result, (list, tuple)):
-            select_expr = b", ".join(self._quote(obj) for obj in result)
+        if isinstance(result, (list, tuple, dict)):
+            if isinstance(result, dict):
+                result = result.items()
+            select_expr = b", ".join((self._quote(obj[1]) + b" as " + self._quote_identifier(obj[0])
+                if isinstance(obj, (list, tuple)) else self._quote(obj)) for obj in result)
         else:
             select_expr = self._quote(result)
         return self.append(b"select " + select_expr)
@@ -180,7 +180,8 @@ class SqlBuilder(object):
             return self.append(b"where " + self._as_bytes(pairs))
 
         return self.append(b"set " + b", ".join(self._quote_identifier(key) + b"=" + self._quote(value)
-            for key, value in (pairs if isinstance(pairs, dict) else pairs(SNameBase())).items()))
+            for key, value in (pairs.items() if isinstance(pairs, dict) else
+            (pairs if isinstance(pairs, (list, tuple)) else pairs(SNameBase()).items()))))
 
     def update(self, table, ignore=False):
         """
