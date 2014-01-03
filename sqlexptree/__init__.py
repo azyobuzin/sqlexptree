@@ -40,12 +40,16 @@ class SqlBuilder(object):
                 .replace(b"%", b"\\%")
                 .replace(b"_", b"\\_") + b"'")
 
+    def _sub_query(self, builder):
+        assert isinstance(builder, SqlBuilder)
+        return b"(" + builder.build() + b")"
+
     def _quote(self, obj):
         import datetime
         import decimal
 
         if obj is None:
-            return b"NULL"
+            return b"null"
         if isinstance(obj, bool):
             return b"1" if obj else b"0"
         if isinstance(obj, SNameBase):
@@ -60,11 +64,15 @@ class SqlBuilder(object):
             return b"interval " + self._quote_string(str(obj.total_seconds())) + b" second_microsecond"
         if isinstance(obj, _SOperatable):
             return obj._to_bytes(self)
+        if isinstance(obj, SqlBuilder):
+            return self._sub_query(obj)
         if isinstance(obj, (str, unicode, bytes)):
             return self._quote_string(obj)
         raise TypeError()
 
     def _quote_identifier(self, s):
+        if isinstance(s, SqlBuilder):
+            return self._sub_query(s)
         return b"`" + self._as_bytes(s).replace(b"`", b"``") + b"`"
 
     def build(self):
@@ -392,6 +400,9 @@ def op_and(*exprs):
 
 def op_not(expr):
     return SSingleOperator("not", expr)
+
+def op_in(left, right):
+    return SOperator("in", left, right)
 
 def to_hex(value):
     """
