@@ -41,6 +41,7 @@ class SqlBuilder(object):
                 .replace(b"_", b"\\_") + b"'")
 
     def _quote(self, obj):
+        import datetime
         import decimal
 
         if obj is None:
@@ -51,6 +52,12 @@ class SqlBuilder(object):
             return b"*"
         if isinstance(obj, (int, float, decimal.Decimal)):
             return self._as_bytes(str(obj))
+        if isinstance(obj, datetime.datetime):
+            return self._quote_string(obj.strftime("%Y-%m-%d %H:%M:%S"))
+        if isinstance(obj, (datetime.date, datetime.time)):
+            return self._quote_string(str(obj))
+        if isinstance(obj, datetime.timedelta):
+            return b"interval " + self._quote_string(str(obj.total_seconds())) + b" second_microsecond"
         if isinstance(obj, _SOperatable):
             return obj._to_bytes(self)
         if isinstance(obj, (str, unicode, bytes)):
@@ -194,7 +201,7 @@ class SqlBuilder(object):
         ignore     : add "IGNORE" to the SQL if true
         """
 
-        return self.append(b"delete"+ (b" quick" if ignore else b"") + (b" ignore" if ignore else b"")).from_tables(from_tables) 
+        return self.append(b"delete" + (b" quick" if ignore else b"") + (b" ignore" if ignore else b"")).from_tables(from_tables) 
 
 class SNameBase(object):
     def __getattr__(self, name):
