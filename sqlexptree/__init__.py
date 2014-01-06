@@ -7,7 +7,7 @@ license: The MIT License, see http://opensource.org/licenses/mit-license.php
 """
 
 __author__ = "azyobuzin"
-__version__ = "1.0"
+__version__ = "0.1"
 
 if isinstance(u"", str):
     unicode = str

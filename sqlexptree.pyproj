@@ -26,6 +26,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="examples.py" />
+    <Compile Include="setup.py" />
     <Compile Include="sqlexptree\__init__.py" />
   </ItemGroup>
   <ItemGroup>
