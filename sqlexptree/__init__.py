@@ -11,7 +11,6 @@ __version__ = "0.1"
 
 if isinstance(u"", str):
     unicode = str
-if isinstance(0xffffffff, int):
     long = int
 
 class SqlBuilder(object):
