@@ -11,6 +11,8 @@ __version__ = "0.1"
 
 if isinstance(u"", str):
     unicode = str
+if isinstance(0xffffffff, int):
+    long = int
 
 class SqlBuilder(object):
     """A object to build SQL."""
@@ -54,7 +56,7 @@ class SqlBuilder(object):
             return b"1" if obj else b"0"
         if isinstance(obj, SNameBase):
             return b"*"
-        if isinstance(obj, (int, float, decimal.Decimal)):
+        if isinstance(obj, (int, long, float, decimal.Decimal)):
             return self._as_bytes(str(obj))
         if isinstance(obj, datetime.datetime):
             return self._quote_string(obj.strftime("%Y-%m-%d %H:%M:%S"))
